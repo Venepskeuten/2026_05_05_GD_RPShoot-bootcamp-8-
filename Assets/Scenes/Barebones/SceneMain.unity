@@ -402,7 +402,7 @@ MonoBehaviour:
   - {fileID: 941931297850462265, guid: bcd1c7cb37751d3429e26bd37a656845, type: 3}
   ShootSpawnPoints:
   - {fileID: 2034190476}
-  _shootObject: {fileID: 0}
+  _shootObject: {fileID: 941931297850462265, guid: 3d677ff1cd5e203408e0edf02d178ad5, type: 3}
 --- !u!1 &419210643
 GameObject:
   m_ObjectHideFlags: 0

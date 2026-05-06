@@ -115,10 +115,27 @@ public class UIMaster : MonoBehaviour
 
     public void UpdateTimer()
     {
-        var _timerData = GameMaster.Instance.GetTimer();    // gets active timer data
-
-        UI_Phase2_txt_TimerText.text = $"{_timerData}";
-    }    
+        //get the current seconds
+        var _timerData = GameMaster.Instance.GetTimer();
+        
+        // Ensure timer is active before updating text
+        if (UI_Phase2_txt_TimerObj?.activeInHierarchy == true) 
+        {
+            // Show remaining seconds (format to 2 decimals)
+            UI_Phase2_txt_TimerText.text = $"{_timerData:F2}s";
+            
+            // visual feedback to set the timer to red when running out of time
+            if (_timerData <= 15f && _timerData > 0f) 
+            {
+                UI_Phase2_txt_TimerText.color = Color.red;
+            }
+            else if (_timerData <= 3f && _timerData > 0f) 
+            {
+                UI_Phase2_txt_TimerText.color = Color.white;
+            }
+        }
+    }
+    
 }
 
 

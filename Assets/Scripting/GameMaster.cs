@@ -36,7 +36,7 @@ public class GameMaster : MonoBehaviour
         public List<GameObject> Player2Prefabs = new List<GameObject>();        // player_2 rock,paper,scissors prefabs from assets
         public List<Transform> ShootSpawnPoints = new List<Transform>();       //  transform information from the spawnpoints  
         public GameObject _shootObject;                                        //  Prefab to shooot stuff with
-
+        
 
         GameObject _selectedPlayer1 = null;                  //  set to null when the method runs
         GameObject _selectedPlayer2 = null;                  //  Keeps it clean for re-runs of the method or later use
@@ -53,8 +53,8 @@ public class GameMaster : MonoBehaviour
     
         // variables needed for the shoot mechanic in phase 3 of the gameplay loop
         [Header("Phase 3")]
-        float _phase3TimerDelay = 60f;                                          //  time it takes to spawn                                      
-
+        float _phase3TimerDelay = 15f;                                          //  time it takes to spawn                                      
+        bool _isGunSpawning = false;
 
     /*  ========================================
                         UNITY VARIABLES
@@ -173,8 +173,8 @@ public class GameMaster : MonoBehaviour
         // first, spawn players
         SpawnPlayers(_selectedPlayer1, _selectedPlayer2);
 
-        // set timer to 0
-        _phase2Timer = 0f;
+        // set timer to 60
+        _phase2Timer = 60f;
 
         // second, disable UI
         UIMaster.Instance.Disable_Phase1Parent();
@@ -225,16 +225,16 @@ public class GameMaster : MonoBehaviour
     public void Timer()
     {
         // set the time passed and feed it to the variable
-        _phase2Timer += Time.deltaTime;
+        _phase2Timer -= Time.deltaTime;
         
         // check if the timer is larger than the point where the shoot object is meant to spawn and it has not already spawned
-        if (_phase2Timer >= _phase3TimerDelay - 2f && _shootObject == null)
+        if (!_isGunSpawning && _phase2Timer >= (_phase3TimerDelay - 2f)) 
         {
             SpawnShoot();
         }
 
         // if the timer goes beyond (currently 60), end the round
-        if (_phase2Timer >= 60f)
+        if (_phase2Timer <= 0f)
         {
             EndOfRound();
         }        
@@ -248,30 +248,44 @@ public class GameMaster : MonoBehaviour
     // spawn the prefab that will let the losing hand fight back
     void SpawnShoot()
     {
+        // Prevent spawning a second gun for this round
+        if (_isGunSpawning) 
+        {
+            return; 
+        }
+
         if (ShootSpawnPoints.Count == 0)
         {
             Debug.LogWarning("GameMaster: No shoot spawn points assigned!");
+            _isGunSpawning = true; // Fail safely so it doesn't loop spamming warnings
             return;
         }
 
-        // choose a random spawn location from the list of spawnpoints
         int _randomIndex = Random.Range(0, ShootSpawnPoints.Count);
-        
-        // instantiate shoot object
-        if (_shootObject == null)
-        {
-            
-        }
-        
-        // instance of the shoot object present in the scene
+
         GameObject _currentShootInstance = null;
 
-        // Instantiate the ShootObject at the position and rotation of the spawn point
-        _currentShootInstance = Instantiate(_shootObject, ShootSpawnPoints[_randomIndex].position, 
-                                            ShootSpawnPoints[_randomIndex].rotation);
-        
-        Debug.Log("Shoot Object Spawned at: " + _currentShootInstance.name);
+        if (_shootObject != null)
+        {
+            // Instantiate at the random spawn point
+            _currentShootInstance = Instantiate(_shootObject, 
+                                                ShootSpawnPoints[_randomIndex].position, 
+                                                ShootSpawnPoints[_randomIndex].rotation);
+            
+            Debug.Log("Shoot Object Spawned.");
+            
+            // Set flag to true so it only spawns once this round
+            _isGunSpawning = true; 
+            
+            // Note: You need to attach behavior to _currentShootInstance here later
+            // For now, we just spawned the container/gun object.
+        }
+        else
+        {
+            Debug.LogWarning("GameMaster : No shoot object prefab assigned in inspector");
+        }
     }
+
 
     /*  ========================================
                         ROUND END
