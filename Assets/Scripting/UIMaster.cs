@@ -11,16 +11,20 @@ public class UIMaster : MonoBehaviour
     public static UIMaster Instance;
 
 
-    [Header ("UI   -   Phase1")]
+    [Header ("UI   -   Phase1_parents")]
     public GameObject           UI_Phase1_Parent;
 
     // Match reroll
+    [Header ("UI   -   Phase1_Reroll")]
     public TextMeshProUGUI      UI_Phase1_txt_MatchRerollText;
     public GameObject           UI_Phase1_txt_MatchRerollObj;
+    
+    [Header ("UI   -   Phase1_Display Player Hand")]
     // Player display
     public TextMeshProUGUI      UI_Phase1_txt_PlayerDisplay_01Text;
     public TextMeshProUGUI      UI_Phase1_txt_PlayerDisplay_02Text;
 
+    [Header ("UI   -   Phase1_Display points per player")]
     public TextMeshProUGUI      UI_Phase1_txt_PointsDisplay_01Text;
     public TextMeshProUGUI      UI_Phase1_txt_PointsDisplay_02Text;
 

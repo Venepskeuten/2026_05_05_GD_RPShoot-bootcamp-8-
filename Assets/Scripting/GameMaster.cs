@@ -34,6 +34,9 @@ public class GameMaster : MonoBehaviour
         // prefab lists
         public List<GameObject> Player1Prefabs = new List<GameObject>();        // player_1 rock,paper,scissors prefabs from assets
         public List<GameObject> Player2Prefabs = new List<GameObject>();        // player_2 rock,paper,scissors prefabs from assets
+        public List<Transform> ShootSpawnPoints = new List<Transform>();       //  transform information from the spawnpoints  
+        public GameObject _shootObject;                                        //  Prefab to shooot stuff with
+
 
         GameObject _selectedPlayer1 = null;                  //  set to null when the method runs
         GameObject _selectedPlayer2 = null;                  //  Keeps it clean for re-runs of the method or later use
@@ -48,6 +51,10 @@ public class GameMaster : MonoBehaviour
                 return (_phase2Timer);
             }
     
+        // variables needed for the shoot mechanic in phase 3 of the gameplay loop
+        [Header("Phase 3")]
+        float _phase3TimerDelay = 60f;                                          //  time it takes to spawn                                      
+
 
     /*  ========================================
                         UNITY VARIABLES
@@ -64,6 +71,9 @@ public class GameMaster : MonoBehaviour
         // makes sure that a list of prefabs is available at the start of the game
         if(Player1Prefabs == null) Player1Prefabs = new List<GameObject>();
         if(Player2Prefabs == null) Player2Prefabs = new List<GameObject>();
+
+        // make sure that the prefab for the shoot is also available
+        if(_shootObject == null) _shootObject = new GameObject();
 
         UIMaster.Instance.DisableUI_TimerText();
     }
@@ -214,8 +224,16 @@ public class GameMaster : MonoBehaviour
     // timer method
     public void Timer()
     {
+        // set the time passed and feed it to the variable
         _phase2Timer += Time.deltaTime;
+        
+        // check if the timer is larger than the point where the shoot object is meant to spawn and it has not already spawned
+        if (_phase2Timer >= _phase3TimerDelay - 2f && _shootObject == null)
+        {
+            SpawnShoot();
+        }
 
+        // if the timer goes beyond (currently 60), end the round
         if (_phase2Timer >= 60f)
         {
             EndOfRound();
@@ -227,6 +245,33 @@ public class GameMaster : MonoBehaviour
                         PHASE 3
         ========================================    */
 
+    // spawn the prefab that will let the losing hand fight back
+    void SpawnShoot()
+    {
+        if (ShootSpawnPoints.Count == 0)
+        {
+            Debug.LogWarning("GameMaster: No shoot spawn points assigned!");
+            return;
+        }
+
+        // choose a random spawn location from the list of spawnpoints
+        int _randomIndex = Random.Range(0, ShootSpawnPoints.Count);
+        
+        // instantiate shoot object
+        if (_shootObject == null)
+        {
+            
+        }
+        
+        // instance of the shoot object present in the scene
+        GameObject _currentShootInstance = null;
+
+        // Instantiate the ShootObject at the position and rotation of the spawn point
+        _currentShootInstance = Instantiate(_shootObject, ShootSpawnPoints[_randomIndex].position, 
+                                            ShootSpawnPoints[_randomIndex].rotation);
+        
+        Debug.Log("Shoot Object Spawned at: " + _currentShootInstance.name);
+    }
 
     /*  ========================================
                         ROUND END
@@ -281,14 +326,14 @@ public class GameMaster : MonoBehaviour
         if (_points1 >= pointsMax)
         {
             Debug.Log ("GameOver, Player1 has won");
-            SceneManager.LoadScene("GameOver");
+            SceneManager.LoadScene("ScreenGameOver");
 
         }
 
         if (_points2 >= pointsMax)
         {
             Debug.Log ("GameOver, Player2 has won");
-            SceneManager.LoadScene("GameOver");
+            SceneManager.LoadScene("ScreenGameOver");
         }
     }     
 }
