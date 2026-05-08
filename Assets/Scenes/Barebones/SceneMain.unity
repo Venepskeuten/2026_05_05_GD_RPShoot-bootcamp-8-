@@ -390,8 +390,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameMaster
   _UiMasterScript: {fileID: 328467875}
-  _spawnPointPlayer1: {fileID: 1598082765}
-  _spawnPointPlayer2: {fileID: 1754521261}
+  _spawnPointPlayer1: {fileID: 1754521261}
+  _spawnPointPlayer2: {fileID: 1598082765}
   Player1Prefabs:
   - {fileID: 1215032040568803966, guid: 263c6dafd9e72e34eba9b39de6b6a2c1, type: 3}
   - {fileID: 2566905071661602228, guid: d9d2ebb69945cfe4483fb7aa0403633a, type: 3}
@@ -2229,7 +2229,7 @@ GameObject:
   - component: {fileID: 1598082767}
   - component: {fileID: 1598082766}
   m_Layer: 0
-  m_Name: Spawn_p1
+  m_Name: Spawn_p2
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -2341,7 +2341,7 @@ GameObject:
   - component: {fileID: 1754521263}
   - component: {fileID: 1754521262}
   m_Layer: 0
-  m_Name: Spawn_p2
+  m_Name: Spawn_p1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0

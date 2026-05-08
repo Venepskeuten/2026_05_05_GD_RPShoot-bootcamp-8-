@@ -26,8 +26,8 @@ public class GameMaster : MonoBehaviour
             }
 
         [Header ("Spawnpoints")]
-        [SerializeField] Transform _spawnPointPlayer1; // contains in-game location of spawn-point (player 01)
-        [SerializeField] Transform _spawnPointPlayer2; // contains in-game location of spawn point (player 02)
+        [SerializeField] Transform _spawnPointPlayer1;                          // contains in-game location of spawn-point (player 01)
+        [SerializeField] Transform _spawnPointPlayer2;                          // contains in-game location of spawn point (player 02)
 
 
         [Header ("List of prefabs")]
@@ -38,10 +38,11 @@ public class GameMaster : MonoBehaviour
         public GameObject _shootObject;                                        //  Prefab to shooot stuff with
         
 
-        GameObject _selectedPlayer1 = null;                  //  set to null when the method runs
-        GameObject _selectedPlayer2 = null;                  //  Keeps it clean for re-runs of the method or later use
+        GameObject _selectedPlayer1 = null;                 //  set to null when the method runs
+        GameObject _selectedPlayer2 = null;                 //  Keeps it clean for re-runs of the method or later use
         GameObject _currentPlayerInstance1;                 //  instance of the spawned prefab
         GameObject _currentPlayerInstance2;                 //  instance of the spawned prefab   
+        GameObject _currentShootInstance;                   //  Instance of the shoot object spawned
 
         // timer
         float _phase2Timer = 0f;
@@ -53,8 +54,10 @@ public class GameMaster : MonoBehaviour
     
         // variables needed for the shoot mechanic in phase 3 of the gameplay loop
         [Header("Phase 3")]
-        float _phase3TimerDelay = 15f;                                          //  time it takes to spawn                                      
+        float _phase3TimerDelay = 50f;                                          //  time it takes to spawn                                      
         bool _isGunSpawning = false;
+        bool _isPhase2Active = false;
+        int _shootRandomIndex;
 
     /*  ========================================
                         UNITY VARIABLES
@@ -156,11 +159,42 @@ public class GameMaster : MonoBehaviour
         //  Writes the type of hand to the UI.
         UIMaster.Instance.WriteHandType(_hand1, _hand2);
   
-        // TODO : A lil' pause
+        // Caulculate the winning hand using the RPS Winner method
+        PlayerBehavior.HandType _winninghand = GetRPSWinner(_componentRef1.HandSelect, _componentRef2.HandSelect);
+        // check if player one is the loser
+        if      (_componentRef1.HandSelect != _winninghand)
+        {
+            _componentRef1.isLoser = true;
 
-        // go from phase 1 to 2
+        } 
+        // check if player 2 is the loser
+        else if (_componentRef2.HandSelect != _winninghand)
+        {
+            _componentRef2.isLoser = true;
+        }
+
+        // after all calculation and setupn has been done, start the gameplay loop proper
         StartPhase2();
 
+    }
+
+    PlayerBehavior.HandType GetRPSWinner(PlayerBehavior.HandType _h1, PlayerBehavior.HandType _h2)
+    {
+        // Rock beats Scissors
+        if (_h1 == PlayerBehavior.HandType.Rock && _h2 == PlayerBehavior.HandType.scizzor)      return _h1;
+        else if (_h2 == PlayerBehavior.HandType.Rock && _h1 == PlayerBehavior.HandType.scizzor) return _h2;
+
+        // Paper beats Rock  
+        else if (_h1 == PlayerBehavior.HandType.Paper && _h2 == PlayerBehavior.HandType.Rock)   return _h1;
+        else if (_h2 == PlayerBehavior.HandType.Paper && _h1 == PlayerBehavior.HandType.Rock)   return _h2;
+
+        // Scissors beats Paper
+        else if (_h1 == PlayerBehavior.HandType.scizzor && _h2 == PlayerBehavior.HandType.Paper) return _h1;
+        else if (_h2 == PlayerBehavior.HandType.scizzor && _h1 == PlayerBehavior.HandType.Paper) return _h2;
+
+        // If you reach here, it's impossible (tie was already prevented earlier)
+        Debug.LogError("GetRPSWinner: Should never be called with tied hands");
+        return _h1;
     }
 
 
@@ -175,6 +209,9 @@ public class GameMaster : MonoBehaviour
 
         // set timer to 60
         _phase2Timer = 60f;
+
+        // mark second phase as active
+        _isPhase2Active = true; 
 
         // second, disable UI
         UIMaster.Instance.Disable_Phase1Parent();
@@ -224,21 +261,24 @@ public class GameMaster : MonoBehaviour
     // timer method
     public void Timer()
     {
-        // set the time passed and feed it to the variable
+        // Safety Check: Only run timer if we are officially in Phase 2
+        if (!_isPhase2Active) return;
+
+        // set the current amount of seconds to the variable container
         _phase2Timer -= Time.deltaTime;
-        
-        // check if the timer is larger than the point where the shoot object is meant to spawn and it has not already spawned
-        if (!_isGunSpawning && _phase2Timer >= (_phase3TimerDelay - 2f)) 
+
+        // with a grace area of 2 seconds, spawn the shoot object when the timer has eclipsed the delay
+        if (!_isGunSpawning && _phase2Timer <= (_phase3TimerDelay - 2f))
         {
             SpawnShoot();
         }
 
-        // if the timer goes beyond (currently 60), end the round
         if (_phase2Timer <= 0f)
         {
             EndOfRound();
         }        
     }
+
     
 
     /*  ========================================
@@ -261,16 +301,16 @@ public class GameMaster : MonoBehaviour
             return;
         }
 
-        int _randomIndex = Random.Range(0, ShootSpawnPoints.Count);
+        _shootRandomIndex = Random.Range(0, ShootSpawnPoints.Count);
 
-        GameObject _currentShootInstance = null;
+        _currentShootInstance = null;
 
         if (_shootObject != null)
         {
             // Instantiate at the random spawn point
             _currentShootInstance = Instantiate(_shootObject, 
-                                                ShootSpawnPoints[_randomIndex].position, 
-                                                ShootSpawnPoints[_randomIndex].rotation);
+                                                ShootSpawnPoints[_shootRandomIndex].position, 
+                                                ShootSpawnPoints[_shootRandomIndex].rotation);
             
             Debug.Log("Shoot Object Spawned.");
             
@@ -279,10 +319,40 @@ public class GameMaster : MonoBehaviour
             
             // Note: You need to attach behavior to _currentShootInstance here later
             // For now, we just spawned the container/gun object.
+
         }
         else
         {
             Debug.LogWarning("GameMaster : No shoot object prefab assigned in inspector");
+        }
+    }
+
+    public void TransformPlayer(PlayerBehavior.PlayerType dyingPlayerType)
+    {
+        GameObject targetObj = null;
+        
+        // 1. Identify which specific object is losing
+        if (dyingPlayerType == PlayerBehavior.PlayerType.Player01)
+        {
+            targetObj = _currentPlayerInstance1;
+        }
+        else if (dyingPlayerType == PlayerBehavior.PlayerType.Player02)
+        {
+            targetObj = _currentPlayerInstance2;
+        }
+
+        // 2. Safety check before destroy
+        if (targetObj != null)
+        {
+            // Get position before destroying it for the gun spawn
+            Vector3 deathPos = targetObj.transform.position; 
+
+            Destroy(targetObj); 
+
+            // 3. Instantiate shootobject at the location of the destroyed player
+            _currentShootInstance = Instantiate(_shootObject, deathPos, Quaternion.identity);
+            
+            // IMPORTANT: You need to attach behavior to _currentShootInstance here later (Phase 3 logic)
         }
     }
 
@@ -305,18 +375,22 @@ public class GameMaster : MonoBehaviour
         UIMaster.Instance.EnableUI_Phase1Parent();
     }    
 
+    // add a point to player 1
     public void AddPointToPlayer01()
     {
         _points1    ++;
         Debug.Log ($"player one now has {_points1} point(s)");
+
     }
 
+    // add a point to player 2
     public void AddPointToPlayer02()
     {
         _points2    ++;
         Debug.Log ($"player two now has {_points2} point(s)");
     }
 
+    // Clean up various data after the roud has been completed to set it to a base state
     void Cleanup()
     {
         if (_currentPlayerInstance1 != null) Destroy(_currentPlayerInstance1);
@@ -328,6 +402,9 @@ public class GameMaster : MonoBehaviour
 
         // set timer back to 0
         _phase2Timer = 0f;
+
+        // mark second phase being active as false
+        _isPhase2Active = false;
     }
 
     /*  ========================================

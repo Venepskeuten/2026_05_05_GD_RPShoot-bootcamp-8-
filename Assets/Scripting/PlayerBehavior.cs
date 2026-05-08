@@ -26,6 +26,9 @@ public class PlayerBehavior : MonoBehaviour
     // Player stats
     float                       _PlayerMoveSpeed    =   5f;     // speed of the players movement.
 
+    public bool                 isLoser             = false;                        // Has ze player lozed
+    public bool                 canTransform        = false;
+
     // physics and collision
     Rigidbody2D                 _rb;                            // Physics interactions
 
@@ -137,14 +140,28 @@ public class PlayerBehavior : MonoBehaviour
     {
         // find other player and get information from the other PlayerBehavior script
         var _otherPlayer = collision.gameObject.GetComponent<PlayerBehavior>();
-        if (_otherPlayer == null) return;                   // safety check
 
-        // compare hand types to see which one wins.
-        CompareHand(this.HandSelect, _otherPlayer.HandSelect);
+        // check if the player collides with the shoot object.
+        if (collision.gameObject.CompareTag("Weapon"))
+        {               
+            Debug.Log($"[{PlayerSelect}] collided with Shoot - IsLoser: {isLoser}");
 
-        // send event from winning player to gameMaster
+            // If the player is marked as the losing hand (by GameMaster)        
+            if (isLoser == true)
+            {
+                // Pass 'this.PlayerSelect' so GameMaster knows WHICH player is dying
+                GameMaster.Instance.TransformPlayer(PlayerSelect);    
+            }
+        }
+
+        // only compare after hitting the other player. Basically a safety check
+        if (_otherPlayer != null)
+        {
+            // compare hand types to see which one wins.
+            CompareHand(this.HandSelect, _otherPlayer.HandSelect);            
+        }
+        
     }
-    
     void CompareHand(HandType _myHand, HandType _otherHand)
     {
         Debug.Log ($"Other players hand = {_otherHand}");
@@ -200,4 +217,5 @@ public class PlayerBehavior : MonoBehaviour
         // runs back to gamemaster and ends the round
         GameMaster.Instance.EndOfRound();
     }
-}
+}   
+
