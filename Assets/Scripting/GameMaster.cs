@@ -327,34 +327,46 @@ public class GameMaster : MonoBehaviour
         }
     }
 
-    public void TransformPlayer(PlayerBehavior.PlayerType dyingPlayerType)
+public void TransformPlayer(PlayerBehavior.PlayerType dyingPlayerType)
+{
+    GameObject targetObj = null;
+    
+    // 1. Identify which specific object is losing
+    if (dyingPlayerType == PlayerBehavior.PlayerType.Player01)
     {
-        GameObject targetObj = null;
-        
-        // 1. Identify which specific object is losing
-        if (dyingPlayerType == PlayerBehavior.PlayerType.Player01)
-        {
-            targetObj = _currentPlayerInstance1;
-        }
-        else if (dyingPlayerType == PlayerBehavior.PlayerType.Player02)
-        {
-            targetObj = _currentPlayerInstance2;
-        }
-
-        // 2. Safety check before destroy
-        if (targetObj != null)
-        {
-            // Get position before destroying it for the gun spawn
-            Vector3 deathPos = targetObj.transform.position; 
-
-            Destroy(targetObj); 
-
-            // 3. Instantiate shootobject at the location of the destroyed player
-            _currentShootInstance = Instantiate(_shootObject, deathPos, Quaternion.identity);
-            
-            // IMPORTANT: You need to attach behavior to _currentShootInstance here later (Phase 3 logic)
-        }
+        targetObj = _currentPlayerInstance1;
     }
+    else if (dyingPlayerType == PlayerBehavior.PlayerType.Player02) 
+    {
+        targetObj = _currentPlayerInstance2;
+    }
+
+    // 2. Safety check before destroy
+    if (targetObj != null)
+    {
+        // Get position and data from OLD player
+        Vector3 deathPos = targetObj.transform.position;
+        
+        // CRITICAL: Copy control scheme FROM old player TO new gun object
+        var oldBehavior = targetObj.GetComponent<PlayerBehavior>();
+        
+        Destroy(targetObj); 
+
+        // 3. Instantiate shoot object at the location of the destroyed player
+        _currentShootInstance = Instantiate(_shootObject, deathPos, Quaternion.identity);
+        
+        // 4. Attach PlayerBehavior component to preserve data
+        var newBehavior = _currentShootInstance.GetComponent<PlayerBehavior>();
+        if (newBehavior == null) 
+        {
+            newBehavior = _currentShootInstance.AddComponent<PlayerBehavior>();
+        }
+
+        // Copy the control scheme from the old player!
+        newBehavior.PlayerSelect = dyingPlayerType;  // WASD vs Arrows
+        newBehavior.HandSelect = oldBehavior.HandSelect; // Keep RPS hand type if you want
+    }
+}
 
 
     /*  ========================================
@@ -391,21 +403,31 @@ public class GameMaster : MonoBehaviour
     }
 
     // Clean up various data after the roud has been completed to set it to a base state
-    void Cleanup()
-    {
-        if (_currentPlayerInstance1 != null) Destroy(_currentPlayerInstance1);
-        if (_currentPlayerInstance2 != null) Destroy(_currentPlayerInstance2);
+void Cleanup()
+{
+    if (_currentPlayerInstance1 != null) Destroy(_currentPlayerInstance1);
+    if (_currentPlayerInstance2 != null) Destroy(_currentPlayerInstance2);
+    
+    // CRITICAL: Destroy the transformed gun object too
+    if (_currentShootInstance != null) Destroy(_currentShootInstance);
 
-        // Clear references used in PlayerToHandRNG to avoid memory leaks or stale logic
-        _selectedPlayer1 = null; 
-        _selectedPlayer2 = null;
+    // Clear references used in PlayerToHandRNG to avoid memory leaks or stale logic
+    _selectedPlayer1 = null; 
+    _selectedPlayer2 = null;
+    _currentPlayerInstance1 = null;  // Set these to null after destroy too
+    _currentPlayerInstance2 = null;
+    _currentShootInstance = null;
 
-        // set timer back to 0
-        _phase2Timer = 0f;
+    _isGunSpawning = false;
+    _shootRandomIndex = 0;
 
-        // mark second phase being active as false
-        _isPhase2Active = false;
-    }
+    // set timer back to 0
+    _phase2Timer = 0f;
+
+    // mark second phase being active as false
+    _isPhase2Active = false;
+}
+
 
     /*  ========================================
                         GAME END
