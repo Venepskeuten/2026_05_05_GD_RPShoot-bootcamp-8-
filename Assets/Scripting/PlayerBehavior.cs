@@ -7,13 +7,17 @@ public class PlayerBehavior : MonoBehaviour
     /*  ========================================
                         VARIABLES
         ========================================    */
+    
+
     // external links
+    [Header("Player data")]
     GameMaster                  _gameMasterScript;
 
     //  Allows an object to be assigned to which player it belongs.
     public enum PlayerType      {Player01, Player02}            // create options   
     public PlayerType           PlayerSelect;                   // display options on script
-    
+    public PlayerType           shooterType;                    // stores who fired a projectile
+
     //  Allows an object to be assigned wether it is : rock - paper - scizzor
     public enum HandType        {Rock, Paper, scizzor}          // contains hands
     public HandType             HandSelect;                     // displays/stores options on script in unity editor
@@ -24,13 +28,22 @@ public class PlayerBehavior : MonoBehaviour
 
 
     // Player stats
-    float                       _PlayerMoveSpeed    =   5f;     // speed of the players movement.
+    float                       _PlayerMoveSpeed            =   5f;             // speed of the players movement.
+
 
     public bool                 isLoser             = false;                        // Has ze player lozed
     public bool                 canTransform        = false;
+    public bool                 canShoot            = false;
+    public bool hasTransformed = false;
 
     // physics and collision
-    Rigidbody2D                 _rb;                            // Physics interactions
+    public Rigidbody                 _rb;                            // Physics interactions
+
+
+    [Header("Projectile")]
+    public GameObject           _projectilePrefab;              // Assign in Inspector
+    public float                _projectileSpeed = 10f;         // Speed of projectile
+
 
     // Events
 
@@ -45,16 +58,25 @@ public class PlayerBehavior : MonoBehaviour
     
     void Start()
     {
-        _rb                 = GetComponent<Rigidbody2D>();                      // make sure that the physics are applied on the object(s)
+        _rb                 = GetComponent<Rigidbody>();                      // make sure that the physics are applied on the object(s)
         // NOTE TO SELF :   We dont call a game object, because Transform already touches the data of the object the script is on.
     }
 
     void Update()
     {
-        // constantly keeps track of player inputs
-        MovePlayers();
+
+        // if the player has been marked as being able to shoot and presses the space button
+        if (canShoot && Input.GetKeyDown(KeyCode.Space))
+        {
+            Shoot();
+        }   
     }
 
+    void FixedUpdate()
+    {
+        // constantly keeps track of player inputs
+        MovePlayers();            
+    }     
     /*  ========================================
                         PLAYER MOVEMENT
         ========================================    */
@@ -79,56 +101,36 @@ public class PlayerBehavior : MonoBehaviour
 
     void ControlsWASDKeys()
     {
-        Vector3 _direction = Vector3.zero;      // empty container for to-be pressed direction
+        Vector3 _direction = Vector3.zero;
+        Quaternion _targetRotation = _rb.rotation; // default: don't rotate
 
-        // move vertical
-        if (Input.GetKey(KeyCode.W)) {          // move up
-            // transforms the player direction upwards by movement speed when W is pressed.
-            _direction = Vector3.forward;
-        }
+        if      (Input.GetKey(KeyCode.W)) { _direction = Vector3.forward;  _targetRotation = Quaternion.Euler(0, 0, 0);   }
+        else if (Input.GetKey(KeyCode.S)) { _direction = Vector3.back;     _targetRotation = Quaternion.Euler(0, 180, 0); }
+        else if (Input.GetKey(KeyCode.A)) { _direction = Vector3.left;     _targetRotation = Quaternion.Euler(0, 270, 0); }
+        else if (Input.GetKey(KeyCode.D)) { _direction = Vector3.right;    _targetRotation = Quaternion.Euler(0, 90, 0);  }
 
-        else if (Input.GetKey(KeyCode.S)) {      // move down
-            // transforms the player direction upwards by movement speed when W is pressed.
-            _direction = Vector3.back;
+        if (_direction != Vector3.zero)
+        {
+            _rb.MovePosition(_rb.position + _direction * _PlayerMoveSpeed * Time.fixedDeltaTime);
+            _rb.MoveRotation(_targetRotation);
         }
-
-        // move horizontal
-        else if (Input.GetKey(KeyCode.A)) {      // move left
-            // transforms the player direction upwards by movement speed when W is pressed.
-            _direction = Vector3.left;
-        }
-        
-        else if (Input.GetKey(KeyCode.D)) {      // move right
-            // transforms the player direction upwards by movement speed when W is pressed.
-            _direction = Vector3.right;
-        }
-
-        // moves the player based on said direction and movement speed
-        transform.Translate(_direction * _PlayerMoveSpeed * Time.deltaTime);
-    }  
+    }
 
     void ControlsArrowKeys()
     {
-        // just read WASD arrow comments if you wanna know what this does. I aint writing that twice.
         Vector3 _direction = Vector3.zero;
+        Quaternion _targetRotation = _rb.rotation; // default: don't rotate
 
-        if (Input.GetKey(KeyCode.UpArrow)) {          // move up
-            _direction = Vector3.forward;
-        }
+        if      (Input.GetKey(KeyCode.UpArrow))     { _direction = Vector3.forward;  _targetRotation = Quaternion.Euler(0, 0, 0);   }
+        else if (Input.GetKey(KeyCode.DownArrow))   { _direction = Vector3.back;     _targetRotation = Quaternion.Euler(0, 180, 0); }
+        else if (Input.GetKey(KeyCode.RightArrow))  { _direction = Vector3.left;     _targetRotation = Quaternion.Euler(0, 270, 0); }
+        else if (Input.GetKey(KeyCode.LeftArrow))   { _direction = Vector3.right;    _targetRotation = Quaternion.Euler(0, 90, 0);  }
 
-        else if (Input.GetKey(KeyCode.DownArrow)) {      // move down
-            _direction = Vector3.back;
+        if (_direction != Vector3.zero)
+        {
+            _rb.MovePosition(_rb.position + _direction * _PlayerMoveSpeed * Time.fixedDeltaTime);
+            _rb.MoveRotation(_targetRotation);
         }
-
-        else if (Input.GetKey(KeyCode.LeftArrow)) {      // move left
-            _direction = Vector3.left;
-        }
-        
-        else if (Input.GetKey(KeyCode.RightArrow)) {      // move right
-            _direction = Vector3.right;
-        }
-
-        transform.Translate(_direction * _PlayerMoveSpeed * Time.deltaTime);
     }
 
     /*  ========================================
@@ -138,19 +140,18 @@ public class PlayerBehavior : MonoBehaviour
 
     void OnCollisionEnter(Collision collision)
     {
+
         // find other player and get information from the other PlayerBehavior script
         var _otherPlayer = collision.gameObject.GetComponent<PlayerBehavior>();
 
         // check if the player collides with the shoot object.
         if (collision.gameObject.CompareTag("Weapon"))
-        {               
-            Debug.Log($"[{PlayerSelect}] collided with Shoot - IsLoser: {isLoser}");
-
-            // If the player is marked as the losing hand (by GameMaster)        
-            if (isLoser == true)
+        {
+            if (isLoser && !hasTransformed)
             {
-                // Pass 'this.PlayerSelect' so GameMaster knows WHICH player is dying
-                GameMaster.Instance.TransformPlayer(PlayerSelect);    
+                hasTransformed = true;
+                Destroy(collision.gameObject); // destroy the pickup
+                GameMaster.Instance.TransformPlayer(PlayerSelect);
             }
         }
 
@@ -162,6 +163,7 @@ public class PlayerBehavior : MonoBehaviour
         }
         
     }
+
     void CompareHand(HandType _myHand, HandType _otherHand)
     {
         Debug.Log ($"Other players hand = {_otherHand}");
@@ -217,5 +219,55 @@ public class PlayerBehavior : MonoBehaviour
         // runs back to gamemaster and ends the round
         GameMaster.Instance.EndOfRound();
     }
+
+    /*  ========================================
+                        SHOOTING MECHANICS
+        ========================================    */    
+
+    void Shoot()
+    {
+        // 1. Safety Check: Ensure Prefab exists
+        if (_projectilePrefab == null) 
+        {
+            Debug.LogWarning("[Shoot] Projectile Prefab not assigned in Inspector!");
+            return;
+        }
+
+        // 2. Get current facing direction (standard for 3D shooters)
+        Vector3 shootDir = transform.forward; 
+        
+        // 3. Instantiate projectile at player position with matching rotation
+        GameObject projObj = Instantiate(_projectilePrefab, transform.position, transform.rotation);
+        
+        // 4. Get Rigidbody component from the new object
+        Rigidbody rbProj = projObj.GetComponent<Rigidbody>();
+
+        // 5. Add Rigidbody if missing (ensure it can move)
+        if (rbProj == null) 
+        {
+            rbProj = projObj.AddComponent<Rigidbody>();
+            
+            // CRITICAL: Use 'useGravity' for 3D, NOT gravityScale
+            rbProj.useGravity = false; // Disables falling (projectile flies straight)
+            
+            // Ensure we don't have kinematic constraints preventing movement
+            rbProj.isKinematic = false;
+        }
+
+        // 6. Apply velocity manually (bypasses standard physics forces)
+        rbProj.linearVelocity = shootDir * _projectileSpeed;
+
+        projObj.tag = "Projectile";
+
+        // Stamp shooter identity onto the projectile
+        var projBehavior = projObj.GetComponent<ProjectileBehavior>();
+        if (projBehavior == null) projBehavior = projObj.AddComponent<ProjectileBehavior>();
+        projBehavior.shooterType = this.PlayerSelect;
+
+        // Ignore collision between projectile and the player who fired it
+        Physics.IgnoreCollision(projObj.GetComponent<Collider>(), GetComponent<Collider>());
+    }
+
+
 }   
 

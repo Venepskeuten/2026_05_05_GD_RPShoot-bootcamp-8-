@@ -1,6 +1,6 @@
 %YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
---- !u!1 &941931297850462265
+--- !u!1 &1441454232472386175
 GameObject:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -8,26 +8,26 @@ GameObject:
   m_PrefabAsset: {fileID: 0}
   serializedVersion: 6
   m_Component:
-  - component: {fileID: 6575271444710830062}
-  - component: {fileID: 3819682821840261384}
-  - component: {fileID: 3286542589856825872}
-  - component: {fileID: 3699511242835145132}
-  - component: {fileID: 1421074744118763734}
-  - component: {fileID: 5120701182075647554}
+  - component: {fileID: 7656830883091711233}
+  - component: {fileID: 5180963051482635507}
+  - component: {fileID: 8687392396133009222}
+  - component: {fileID: 4013218130439798497}
+  - component: {fileID: 7603905016034729746}
+  - component: {fileID: 8339562283429105342}
   m_Layer: 0
-  m_Name: P2_Scizzor
+  m_Name: P2_paper  1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
   m_IsActive: 1
---- !u!4 &6575271444710830062
+--- !u!4 &7656830883091711233
 Transform:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 941931297850462265}
+  m_GameObject: {fileID: 1441454232472386175}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
@@ -36,21 +36,21 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!33 &3819682821840261384
+--- !u!33 &5180963051482635507
 MeshFilter:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 941931297850462265}
+  m_GameObject: {fileID: 1441454232472386175}
   m_Mesh: {fileID: 10202, guid: 0000000000000000e000000000000000, type: 0}
---- !u!23 &3286542589856825872
+--- !u!23 &8687392396133009222
 MeshRenderer:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 941931297850462265}
+  m_GameObject: {fileID: 1441454232472386175}
   m_Enabled: 1
   m_CastShadows: 1
   m_ReceiveShadows: 1
@@ -93,13 +93,13 @@ MeshRenderer:
   m_SortingOrder: 0
   m_MaskInteraction: 0
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!65 &3699511242835145132
+--- !u!65 &4013218130439798497
 BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 941931297850462265}
+  m_GameObject: {fileID: 1441454232472386175}
   m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
@@ -114,27 +114,35 @@ BoxCollider:
   serializedVersion: 3
   m_Size: {x: 1, y: 1, z: 1}
   m_Center: {x: 0, y: 0, z: 0}
---- !u!114 &1421074744118763734
+--- !u!114 &7603905016034729746
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 941931297850462265}
+  m_GameObject: {fileID: 1441454232472386175}
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: bb5187158845c384880b2ef6ef79f9bd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerBehavior
   PlayerSelect: 1
-  HandSelect: 2
---- !u!54 &5120701182075647554
+  shooterType: 1
+  HandSelect: 1
+  isLoser: 0
+  canTransform: 0
+  canShoot: 0
+  hasTransformed: 0
+  _rb: {fileID: 0}
+  _projectilePrefab: {fileID: 8057886398420060687, guid: 491ac6b806988e84888fb2e4a8087b5b, type: 3}
+  _projectileSpeed: 10
+--- !u!54 &8339562283429105342
 Rigidbody:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 941931297850462265}
+  m_GameObject: {fileID: 1441454232472386175}
   serializedVersion: 5
   m_Mass: 1
   m_LinearDamping: 0
@@ -153,5 +161,5 @@ Rigidbody:
   m_UseGravity: 1
   m_IsKinematic: 0
   m_Interpolate: 0
-  m_Constraints: 116
+  m_Constraints: 36
   m_CollisionDetection: 0

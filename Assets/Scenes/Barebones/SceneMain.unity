@@ -393,13 +393,13 @@ MonoBehaviour:
   _spawnPointPlayer1: {fileID: 1754521261}
   _spawnPointPlayer2: {fileID: 1598082765}
   Player1Prefabs:
-  - {fileID: 1215032040568803966, guid: 263c6dafd9e72e34eba9b39de6b6a2c1, type: 3}
-  - {fileID: 2566905071661602228, guid: d9d2ebb69945cfe4483fb7aa0403633a, type: 3}
-  - {fileID: 2140626324993371356, guid: 440432d8bb6c8df44a009707202fede3, type: 3}
+  - {fileID: 1215032040568803966, guid: 1707aaac05bb1ed41acfbaa207d31774, type: 3}
+  - {fileID: 1441454232472386175, guid: 3d7efa801e0af9744912496340cf60d8, type: 3}
+  - {fileID: 2140626324993371356, guid: d33366c62a47e294393efcf8e3007fee, type: 3}
   Player2Prefabs:
-  - {fileID: 6645906305637379368, guid: 7eb48ae2519872d45a827e53d2635a12, type: 3}
-  - {fileID: 1441454232472386175, guid: c2f7c7413a93e1649b58d17e6658f931, type: 3}
-  - {fileID: 941931297850462265, guid: bcd1c7cb37751d3429e26bd37a656845, type: 3}
+  - {fileID: 6645906305637379368, guid: 894573da6d10f834092efb4c032b619b, type: 3}
+  - {fileID: 1441454232472386175, guid: 3d7efa801e0af9744912496340cf60d8, type: 3}
+  - {fileID: 941931297850462265, guid: c296f2db15961d74e974ec2db6fb492f, type: 3}
   ShootSpawnPoints:
   - {fileID: 2034190476}
   _shootObject: {fileID: 941931297850462265, guid: 3d677ff1cd5e203408e0edf02d178ad5, type: 3}

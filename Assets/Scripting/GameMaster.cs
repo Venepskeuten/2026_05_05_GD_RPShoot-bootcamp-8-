@@ -161,20 +161,8 @@ public class GameMaster : MonoBehaviour
   
         // Caulculate the winning hand using the RPS Winner method
         PlayerBehavior.HandType _winninghand = GetRPSWinner(_componentRef1.HandSelect, _componentRef2.HandSelect);
-        // check if player one is the loser
-        if      (_componentRef1.HandSelect != _winninghand)
-        {
-            _componentRef1.isLoser = true;
+        StartPhase2(_winninghand);
 
-        } 
-        // check if player 2 is the loser
-        else if (_componentRef2.HandSelect != _winninghand)
-        {
-            _componentRef2.isLoser = true;
-        }
-
-        // after all calculation and setupn has been done, start the gameplay loop proper
-        StartPhase2();
 
     }
 
@@ -202,18 +190,22 @@ public class GameMaster : MonoBehaviour
                         PHASE 2
         ========================================    */
 
-    public void StartPhase2() {
-
-        // first, spawn players
+    public void StartPhase2(PlayerBehavior.HandType winningHand)
+    {
+        // 1. Spawn instances first — NEVER modify prefab assets directly
         SpawnPlayers(_selectedPlayer1, _selectedPlayer2);
 
-        // set timer to 60
+        // 2. Now get components from the live instances, not the prefab references
+        var instance1Behavior = _currentPlayerInstance1.GetComponent<PlayerBehavior>();
+        var instance2Behavior = _currentPlayerInstance2.GetComponent<PlayerBehavior>();
+
+        // 3. Mark the loser on the instance — safe because this is a clone, not the asset
+        if (instance1Behavior.HandSelect != winningHand) instance1Behavior.isLoser = true;
+        else if (instance2Behavior.HandSelect != winningHand) instance2Behavior.isLoser = true;
+
+        // 4. Start timer and update UI
         _phase2Timer = 60f;
-
-        // mark second phase as active
-        _isPhase2Active = true; 
-
-        // second, disable UI
+        _isPhase2Active = true;
         UIMaster.Instance.Disable_Phase1Parent();
         UIMaster.Instance.EnableUI_TimerText();
     }
@@ -234,8 +226,8 @@ public class GameMaster : MonoBehaviour
             }
 
             // Apply Rigidbody
-            Rigidbody2D rb = _currentPlayerInstance1.GetComponent<Rigidbody2D>();
-            if (rb == null) _currentPlayerInstance1.AddComponent<Rigidbody2D>();
+            Rigidbody rb = _currentPlayerInstance1.GetComponent<Rigidbody>();
+            if (rb == null) _currentPlayerInstance1.AddComponent<Rigidbody>();
         }
 
         // --- Phase 2: Spawn Player 2 ---
@@ -251,8 +243,8 @@ public class GameMaster : MonoBehaviour
             }
 
             // Apply Rigidbody
-            Rigidbody2D rb = _currentPlayerInstance2.GetComponent<Rigidbody2D>();
-            if (rb == null) _currentPlayerInstance2.AddComponent<Rigidbody2D>();
+            Rigidbody rb = _currentPlayerInstance2.GetComponent<Rigidbody>();
+            if (rb == null) _currentPlayerInstance2.AddComponent<Rigidbody>();
         }
 
         Debug.Log("Spawning Complete.");        
@@ -327,46 +319,73 @@ public class GameMaster : MonoBehaviour
         }
     }
 
-public void TransformPlayer(PlayerBehavior.PlayerType dyingPlayerType)
-{
-    GameObject targetObj = null;
-    
-    // 1. Identify which specific object is losing
-    if (dyingPlayerType == PlayerBehavior.PlayerType.Player01)
+    public void TransformPlayer(PlayerBehavior.PlayerType dyingPlayerType)
     {
-        targetObj = _currentPlayerInstance1;
-    }
-    else if (dyingPlayerType == PlayerBehavior.PlayerType.Player02) 
-    {
-        targetObj = _currentPlayerInstance2;
-    }
-
-    // 2. Safety check before destroy
-    if (targetObj != null)
-    {
-        // Get position and data from OLD player
-        Vector3 deathPos = targetObj.transform.position;
+        GameObject targetObj = null;
         
-        // CRITICAL: Copy control scheme FROM old player TO new gun object
-        var oldBehavior = targetObj.GetComponent<PlayerBehavior>();
-        
-        Destroy(targetObj); 
-
-        // 3. Instantiate shoot object at the location of the destroyed player
-        _currentShootInstance = Instantiate(_shootObject, deathPos, Quaternion.identity);
-        
-        // 4. Attach PlayerBehavior component to preserve data
-        var newBehavior = _currentShootInstance.GetComponent<PlayerBehavior>();
-        if (newBehavior == null) 
+        // 1. Identify which specific object is losing
+        if (dyingPlayerType == PlayerBehavior.PlayerType.Player01)
         {
-            newBehavior = _currentShootInstance.AddComponent<PlayerBehavior>();
+            targetObj = _currentPlayerInstance1;
+        }
+        else if (dyingPlayerType == PlayerBehavior.PlayerType.Player02) 
+        {
+            targetObj = _currentPlayerInstance2;
         }
 
-        // Copy the control scheme from the old player!
-        newBehavior.PlayerSelect = dyingPlayerType;  // WASD vs Arrows
-        newBehavior.HandSelect = oldBehavior.HandSelect; // Keep RPS hand type if you want
+        // 2. Safety check before destroy
+        if (targetObj != null)
+        {
+            // Get position and data from OLD player
+            Vector3 deathPos = targetObj.transform.position;
+            
+            // CRITICAL: Copy control scheme FROM old player TO new gun object
+            var oldBehavior = targetObj.GetComponent<PlayerBehavior>();
+            
+            Destroy(targetObj);
+
+            // 3. Instantiate shoot object at the location of the destroyed player
+            _currentShootInstance = Instantiate(_shootObject, deathPos, Quaternion.identity);
+            
+            // 4. Attach PlayerBehavior component to preserve data
+            var newBehavior = _currentShootInstance.GetComponent<PlayerBehavior>();
+            if (newBehavior == null) 
+            {
+                newBehavior = _currentShootInstance.AddComponent<PlayerBehavior>();
+            }
+
+            // Inherit the projectile prefab (otherwise PlayerBehavior will think its empty)
+            if (oldBehavior._projectilePrefab != null) 
+            {
+                newBehavior._projectilePrefab = oldBehavior._projectilePrefab;
+            }
+
+            // 4. Copy the control scheme from the old player!
+            newBehavior.PlayerSelect = dyingPlayerType;         // WASD vs Arrows
+            newBehavior.HandSelect = oldBehavior.HandSelect;    // Keep RPS hand type if you want
+
+            // NEW
+            newBehavior.shooterType = dyingPlayerType;
+
+            // 5. mark the new object as being able to shoot projectiles
+            newBehavior.canShoot = true;
+            
+            // Get or add Rigidbody directly on the GameObject, not through the behavior's cached field
+            Rigidbody rb = _currentShootInstance.GetComponent<Rigidbody>();
+            if (rb == null) rb = _currentShootInstance.AddComponent<Rigidbody>();
+            rb.useGravity = false;
+            rb.constraints = RigidbodyConstraints.FreezePositionY
+                        | RigidbodyConstraints.FreezeRotationX
+                        | RigidbodyConstraints.FreezeRotationZ;
+
+            // Manually assign it to newBehavior so it doesn't have to wait for Start()
+            newBehavior._rb = rb;
+            
+                        
+        }
+        
     }
-}
+
 
 
     /*  ========================================
@@ -402,32 +421,31 @@ public void TransformPlayer(PlayerBehavior.PlayerType dyingPlayerType)
         Debug.Log ($"player two now has {_points2} point(s)");
     }
 
+
     // Clean up various data after the roud has been completed to set it to a base state
-void Cleanup()
-{
-    if (_currentPlayerInstance1 != null) Destroy(_currentPlayerInstance1);
-    if (_currentPlayerInstance2 != null) Destroy(_currentPlayerInstance2);
-    
-    // CRITICAL: Destroy the transformed gun object too
-    if (_currentShootInstance != null) Destroy(_currentShootInstance);
+    void Cleanup()
+    {
+        // Destroy any projectiles still in the scene
+        foreach (GameObject proj in GameObject.FindGameObjectsWithTag("Projectile"))
+        {
+            Destroy(proj);
+        }
 
-    // Clear references used in PlayerToHandRNG to avoid memory leaks or stale logic
-    _selectedPlayer1 = null; 
-    _selectedPlayer2 = null;
-    _currentPlayerInstance1 = null;  // Set these to null after destroy too
-    _currentPlayerInstance2 = null;
-    _currentShootInstance = null;
+        if (_currentPlayerInstance1 != null) Destroy(_currentPlayerInstance1);
+        if (_currentPlayerInstance2 != null) Destroy(_currentPlayerInstance2);
+        if (_currentShootInstance != null)   Destroy(_currentShootInstance);
 
-    _isGunSpawning = false;
-    _shootRandomIndex = 0;
+        _selectedPlayer1        = null;
+        _selectedPlayer2        = null;
+        _currentPlayerInstance1 = null;
+        _currentPlayerInstance2 = null;
+        _currentShootInstance   = null;
 
-    // set timer back to 0
-    _phase2Timer = 0f;
-
-    // mark second phase being active as false
-    _isPhase2Active = false;
-}
-
+        _isGunSpawning  = false;
+        _shootRandomIndex = 0;
+        _phase2Timer    = 0f;
+        _isPhase2Active = false;
+    }
 
     /*  ========================================
                         GAME END
