@@ -7,105 +7,142 @@ public class GameMaster : MonoBehaviour
 
     /*  ========================================
                         VARIABLES
+        ========================================
+        GameMaster is the central brain of the game. All game state lives here:
+        scores, spawned player instances, the timer, and phase tracking.
+        Other scripts (PlayerBehavior, UIMaster) call back into GameMaster
+        rather than managing state themselves, keeping all logic centralized.
         ========================================    */
 
-        // links and stuff
+        // Singleton reference — allows any script to reach GameMaster via GameMaster.Instance
+        // without needing a direct inspector link. Every script in the project uses this.
         public static GameMaster Instance;
         
         [Header ("External Links")]
-        [SerializeField] UIMaster _UiMasterScript; 
+        [SerializeField] UIMaster _UiMasterScript;      // Direct inspector link to UIMaster (backup reference, Instance is preferred)
 
-        // point count per player
-        int _points1    =   0;              //  Player 1
-        int _points2    =   0;              //  Player 2
-        int pointsMax   =   3;              //  Max amount of points
+        // ---- SCORING ----
+        // Points are tracked here and never on the player objects themselves.
+        // PlayerBehavior and ProjectileBehavior call AddPointToPlayer01/02 to increment these.
+        int _points1    =   0;              // Running point total for Player 1
+        int _points2    =   0;              // Running point total for Player 2
+        int pointsMax   =   3;              // First to this many points wins the match
+
+            // Read-only accessor for scores.
+            // UIMaster.UpdatePoints() calls this to display current scores without being
+            // able to accidentally modify them.
             public (int p1, int p2) Getpoints() 
             {
-                // Lets another method get the value stored in points
                 return (_points1, _points2);
             }
 
+        // ---- SPAWN POINTS ----
+        // Set in the Inspector. These are empty GameObjects placed in the scene
+        // whose Transform positions are used as player spawn locations each round.
         [Header ("Spawnpoints")]
-        [SerializeField] Transform _spawnPointPlayer1;                          // contains in-game location of spawn-point (player 01)
-        [SerializeField] Transform _spawnPointPlayer2;                          // contains in-game location of spawn point (player 02)
+        [SerializeField] Transform _spawnPointPlayer1;      // Where Player 1 appears at the start of each round
+        [SerializeField] Transform _spawnPointPlayer2;      // Where Player 2 appears at the start of each round
 
 
+        // ---- PREFAB LISTS ----
+        // These lists are populated in the Inspector with the Rock/Paper/Scissors prefabs
+        // for each player. A random one is picked each round by PlayerToHandRNG().
+        // IMPORTANT: Never modify components on these directly at runtime — they are asset
+        // references, not scene instances. Modifying them writes to the file on disk.
         [Header ("List of prefabs")]
-        // prefab lists
-        public List<GameObject> Player1Prefabs = new List<GameObject>();        // player_1 rock,paper,scissors prefabs from assets
-        public List<GameObject> Player2Prefabs = new List<GameObject>();        // player_2 rock,paper,scissors prefabs from assets
-        public List<Transform> ShootSpawnPoints = new List<Transform>();       //  transform information from the spawnpoints  
-        public GameObject _shootObject;                                        //  Prefab to shooot stuff with
-        
+        public List<GameObject> Player1Prefabs = new List<GameObject>();    // P1's Rock, Paper, Scissors prefabs
+        public List<GameObject> Player2Prefabs = new List<GameObject>();    // P2's Rock, Paper, Scissors prefabs
+        public List<Transform> ShootSpawnPoints = new List<Transform>();    // Possible spawn locations for the Weapon pickup
+        public GameObject _shootObject;                                     // The Weapon/gun prefab the loser transforms into
 
-        GameObject _selectedPlayer1 = null;                 //  set to null when the method runs
-        GameObject _selectedPlayer2 = null;                 //  Keeps it clean for re-runs of the method or later use
-        GameObject _currentPlayerInstance1;                 //  instance of the spawned prefab
-        GameObject _currentPlayerInstance2;                 //  instance of the spawned prefab   
-        GameObject _currentShootInstance;                   //  Instance of the shoot object spawned
+        // ---- RUNTIME INSTANCE REFERENCES ----
+        // These hold references to the actual cloned objects currently in the scene.
+        // They are set during SpawnPlayers() and cleared in Cleanup() at round end.
+        GameObject _selectedPlayer1 = null;         // The prefab asset randomly chosen for P1 this round
+        GameObject _selectedPlayer2 = null;         // The prefab asset randomly chosen for P2 this round
+        GameObject _currentPlayerInstance1;         // The live P1 clone currently in the scene
+        GameObject _currentPlayerInstance2;         // The live P2 clone currently in the scene
+        GameObject _currentShootInstance;           // The live Weapon/gun clone currently in the scene
 
-        // timer
+        // ---- TIMER ----
+        // Counts down during Phase 2. Drives the Phase 3 weapon spawn and round timeout.
         float _phase2Timer = 0f;
+
+            // Read-only accessor for the timer value.
+            // UIMaster.UpdateTimer() polls this every frame to display the countdown.
             public float GetTimer() 
             {
-                // Lets another method get the value stored in points
                 return (_phase2Timer);
             }
     
-        // variables needed for the shoot mechanic in phase 3 of the gameplay loop
+        // ---- PHASE 3 STATE ----
         [Header("Phase 3")]
-        float _phase3TimerDelay = 50f;                                          //  time it takes to spawn                                      
-        bool _isGunSpawning = false;
-        bool _isPhase2Active = false;
-        int _shootRandomIndex;
+        float _phase3TimerDelay = 43f;      // How many seconds into Phase 2 the Weapon pickup spawns (60 - 43 = at the 17s mark)
+        bool _isGunSpawning     = false;    // Prevents the weapon from spawning more than once per round
+        bool _isPhase2Active    = false;    // Gate flag — Timer() and SpawnShoot() only run while this is true
+        int _shootRandomIndex;              // Stores which spawn point index was randomly selected for the weapon
+
 
     /*  ========================================
-                        UNITY VARIABLES
+                        UNITY METHODS
+        ========================================
+        Standard Unity lifecycle methods. Awake sets up the singleton.
+        Start validates inspector assignments. Update drives the timer each frame.
         ========================================    */
+
     void Awake()
     {
-        // makes sure only 1 GameMaster runs at a time. useful because all information here is centralized and should not exist doubly.
+        // Register this object as the singleton so other scripts can reach it via GameMaster.Instance.
+        // Only one GameMaster should ever exist — having two would cause conflicting game state.
         Instance = this;
-
     }
 
     void Start()
     {
-        // makes sure that a list of prefabs is available at the start of the game
+        // 1. Ensure prefab lists exist even if the inspector was left empty
         if(Player1Prefabs == null) Player1Prefabs = new List<GameObject>();
         if(Player2Prefabs == null) Player2Prefabs = new List<GameObject>();
 
-        // make sure that the prefab for the shoot is also available
+        // 2. Fallback: if the shoot prefab was forgotten in the inspector, create a blank object
+        //    so the rest of the code doesn't null-crash. A warning will appear at spawn time.
         if(_shootObject == null) _shootObject = new GameObject();
 
+        // 3. Hide the timer UI at game start — it only shows during Phase 2
+        //    Linked to UIMaster.DisableUI_TimerText() which calls SetActive(false) on the timer object.
         UIMaster.Instance.DisableUI_TimerText();
     }
 
     void Update()
     {
+        // Tick the round timer every frame.
+        // Timer() is self-gating — it does nothing if _isPhase2Active is false.
         Timer();
     }
-
-    /*  ========================================
-                        ROUND START
-        ========================================    */
 
 
     /*  ========================================
                         PHASE 1
+        ========================================
+        Phase 1 is the hand-selection screen. The player presses a UI button which
+        calls PlayerToHandRNG(). This randomly assigns Rock/Paper/Scissors to each
+        player, resolves who wins, and triggers Phase 2 if a clear winner exists.
+        The loser flag is set on the SPAWNED INSTANCES (not the prefab assets)
+        inside StartPhase2(), after Instantiate() has already run.
         ========================================    */
 
-    public void PlayerToHandRNG()       //  launches on button press
+    // Entry point for starting a round. Called by a UI Button's OnClick event.
+    public void PlayerToHandRNG()
     {
-        // disable UI text element (looks weird if enabled)
+        // 1. Hide the "same hand, re-roll" message from any previous attempt
+        //    Linked to UIMaster — this controls the MatchReroll text object's visibility.
         UIMaster.Instance.DisableUI_MatchReroll();
 
-        // Creates a GameObject that will contain the randomly selected RPS (rock, paper, scissors) for each player
-        _selectedPlayer1 = null;                  //  set to null when the method runs
-        _selectedPlayer2 = null;                  //  Keeps it clean for re-runs of the method or later use
+        // 2. Clear any previously selected prefabs to avoid carrying stale data into a new round
+        _selectedPlayer1 = null;
+        _selectedPlayer2 = null;
 
-        // randomly select a prefab for player 01
-        // NOTE TO SELF :   Prefabs have in the inspector, an option to toggle which type they are, but its also in the name
+        // 3. Randomly pick a prefab from P1's list (Rock, Paper, or Scissors)
+        //    Each prefab has its HandType set in the Inspector via PlayerBehavior.HandSelect.
         if (Player1Prefabs.Count > 0)
         {
             int _randomIndex = Random.Range(0, Player1Prefabs.Count);
@@ -117,7 +154,7 @@ public class GameMaster : MonoBehaviour
             return;
         }    
 
-        // randomly select a prefab for player 02
+        // 4. Same random selection for P2
         if (Player2Prefabs.Count > 0)
         {
             int _randomIndex = Random.Range(0, Player2Prefabs.Count);
@@ -129,342 +166,381 @@ public class GameMaster : MonoBehaviour
             return;
         }
 
-        // Get the playerBehavior component from the assigned player prefab so we can get its PlayerType and HandType information
+        // 5. Read the HandType from each selected prefab via PlayerBehavior.GetHand().
+        //    NOTE: We are only READING from the prefab here, never writing.
+        //    Writing to _componentRef here would corrupt the prefab asset on disk.
         var _componentRef1 = _selectedPlayer1.GetComponent<PlayerBehavior>();
         var _componentRef2 = _selectedPlayer2.GetComponent<PlayerBehavior>(); 
 
-         if (_componentRef1 == null || _componentRef2 == null)      // safety check
+        if (_componentRef1 == null || _componentRef2 == null)
         {
-            Debug.LogError("One of the prefabs is missing the PlayerBehavior script attached to it!");
+            Debug.LogError("One of the prefabs is missing the PlayerBehavior script!");
             return;
         }
 
-        // Get which hand the prefab has assigned from the component on each prefab
         PlayerBehavior.HandType _hand1 = _componentRef1.GetHand(); 
         PlayerBehavior.HandType _hand2 = _componentRef2.GetHand();
    
-        if (_componentRef1 != null && _componentRef2 != null)   // quick safety check to see if they are not empty
-        {
-            Debug.Log($"Spawned P1={_hand1}, P2={_hand2}");
-        }
+        Debug.Log($"Selected hands — P1={_hand1}, P2={_hand2}");
 
-        // Compare hands
+        // 6. If both players rolled the same hand, show the re-roll prompt and abort.
+        //    The player must press the button again. Linked to UIMaster.EnableUI_MatchReroll().
         if (_hand1 == _hand2)
         {
-            // enable relevant UI text bit under the button
             UIMaster.Instance.EnableUI_MatchReroll();
-            return;     // stop executing the method
+            return;
         }
 
-        //  Writes the type of hand to the UI.
+        // 7. Display the chosen hand names in the Phase 1 UI.
+        //    Linked to UIMaster.WriteHandType() which updates the two player hand label texts.
         UIMaster.Instance.WriteHandType(_hand1, _hand2);
   
-        // Caulculate the winning hand using the RPS Winner method
+        // 8. Determine the winning hand using the RPS ruleset
         PlayerBehavior.HandType _winninghand = GetRPSWinner(_componentRef1.HandSelect, _componentRef2.HandSelect);
+
+        // 9. Proceed to Phase 2, passing the winning hand so the loser can be flagged
+        //    on the spawned instances (not on the prefab assets).
         StartPhase2(_winninghand);
-
-
     }
 
+    // Pure logic helper — takes two HandTypes and returns which one wins per RPS rules.
+    // Called only by PlayerToHandRNG(). Ties are already prevented before this is called.
     PlayerBehavior.HandType GetRPSWinner(PlayerBehavior.HandType _h1, PlayerBehavior.HandType _h2)
     {
         // Rock beats Scissors
-        if (_h1 == PlayerBehavior.HandType.Rock && _h2 == PlayerBehavior.HandType.scizzor)      return _h1;
-        else if (_h2 == PlayerBehavior.HandType.Rock && _h1 == PlayerBehavior.HandType.scizzor) return _h2;
+        if      (_h1 == PlayerBehavior.HandType.Rock    && _h2 == PlayerBehavior.HandType.scizzor) return _h1;
+        else if (_h2 == PlayerBehavior.HandType.Rock    && _h1 == PlayerBehavior.HandType.scizzor) return _h2;
 
         // Paper beats Rock  
-        else if (_h1 == PlayerBehavior.HandType.Paper && _h2 == PlayerBehavior.HandType.Rock)   return _h1;
-        else if (_h2 == PlayerBehavior.HandType.Paper && _h1 == PlayerBehavior.HandType.Rock)   return _h2;
+        else if (_h1 == PlayerBehavior.HandType.Paper   && _h2 == PlayerBehavior.HandType.Rock)   return _h1;
+        else if (_h2 == PlayerBehavior.HandType.Paper   && _h1 == PlayerBehavior.HandType.Rock)   return _h2;
 
         // Scissors beats Paper
-        else if (_h1 == PlayerBehavior.HandType.scizzor && _h2 == PlayerBehavior.HandType.Paper) return _h1;
-        else if (_h2 == PlayerBehavior.HandType.scizzor && _h1 == PlayerBehavior.HandType.Paper) return _h2;
+        else if (_h1 == PlayerBehavior.HandType.scizzor && _h2 == PlayerBehavior.HandType.Paper)  return _h1;
+        else if (_h2 == PlayerBehavior.HandType.scizzor && _h1 == PlayerBehavior.HandType.Paper)  return _h2;
 
-        // If you reach here, it's impossible (tie was already prevented earlier)
-        Debug.LogError("GetRPSWinner: Should never be called with tied hands");
+        Debug.LogError("GetRPSWinner: reached unreachable code — tie should have been caught earlier.");
         return _h1;
     }
 
 
     /*  ========================================
                         PHASE 2
+        ========================================
+        Phase 2 is the active gameplay phase. Players move around the arena
+        trying to collide with each other. The winner is decided by their RPS hand.
+        A timer counts down; when it expires the round ends with no point awarded.
+        The weapon pickup spawns partway through this phase, triggering Phase 3.
         ========================================    */
 
+    // Transitions the game from the hand-selection screen into live gameplay.
+    // Accepts the winning hand so it can mark the loser on the live instance,
+    // not on the prefab asset (which would corrupt it permanently).
     public void StartPhase2(PlayerBehavior.HandType winningHand)
     {
-        // 1. Spawn instances first — NEVER modify prefab assets directly
+        // 1. Instantiate both player prefabs into the scene at their spawn points.
+        //    After this call, _currentPlayerInstance1 and _currentPlayerInstance2 are live objects.
         SpawnPlayers(_selectedPlayer1, _selectedPlayer2);
 
-        // 2. Now get components from the live instances, not the prefab references
+        // 2. NOW it is safe to write to PlayerBehavior — these are instances, not prefab assets.
+        //    Mark whichever instance has the losing hand. PlayerBehavior.isLoser is read later
+        //    in PlayerBehavior.OnCollisionEnter to decide if the player should transform.
         var instance1Behavior = _currentPlayerInstance1.GetComponent<PlayerBehavior>();
         var instance2Behavior = _currentPlayerInstance2.GetComponent<PlayerBehavior>();
 
-        // 3. Mark the loser on the instance — safe because this is a clone, not the asset
         if (instance1Behavior.HandSelect != winningHand) instance1Behavior.isLoser = true;
         else if (instance2Behavior.HandSelect != winningHand) instance2Behavior.isLoser = true;
 
-        // 4. Start timer and update UI
+        // 3. Set the countdown timer. Timer() in Update() will now begin counting down.
         _phase2Timer = 60f;
+
+        // 4. Open the gate flag so Timer() and SpawnShoot() are allowed to run
         _isPhase2Active = true;
+
+        // 5. Swap the UI from Phase 1 (button screen) to Phase 2 (timer display).
+        //    Linked to UIMaster — hides the hand-select panel, shows the countdown.
         UIMaster.Instance.Disable_Phase1Parent();
         UIMaster.Instance.EnableUI_TimerText();
     }
 
-
+    // Spawns both player prefabs as new scene instances and places them at their spawn points.
+    // Called by StartPhase2(). Populates _currentPlayerInstance1 and _currentPlayerInstance2.
     public void SpawnPlayers(GameObject p1Prefab, GameObject p2Prefab)
     {
-    // --- Phase 1: Spawn Player 1 ---
+        // 1. Instantiate P1 and move the clone to its designated spawn point
         if (p1Prefab != null)
         {
             _currentPlayerInstance1 = Instantiate(p1Prefab); 
 
-            // Snap to SpawnPointPlayer1 position and rotation
             if (_spawnPointPlayer1 != null)
             {
                 _currentPlayerInstance1.transform.position = _spawnPointPlayer1.position; 
                 _currentPlayerInstance1.transform.rotation = _spawnPointPlayer1.rotation; 
             }
 
-            // Apply Rigidbody
+            // Ensure a Rigidbody exists for physics-based movement (MovePosition / MoveRotation)
             Rigidbody rb = _currentPlayerInstance1.GetComponent<Rigidbody>();
             if (rb == null) _currentPlayerInstance1.AddComponent<Rigidbody>();
         }
 
-        // --- Phase 2: Spawn Player 2 ---
+        // 2. Same process for P2
         if (p2Prefab != null)
         {
             _currentPlayerInstance2 = Instantiate(p2Prefab); 
 
-            // Snap to SpawnPointPlayer2 position and rotation
             if (_spawnPointPlayer2 != null)
             {
                 _currentPlayerInstance2.transform.position = _spawnPointPlayer2.position; 
                 _currentPlayerInstance2.transform.rotation = _spawnPointPlayer2.rotation; 
             }
 
-            // Apply Rigidbody
             Rigidbody rb = _currentPlayerInstance2.GetComponent<Rigidbody>();
             if (rb == null) _currentPlayerInstance2.AddComponent<Rigidbody>();
         }
 
-        Debug.Log("Spawning Complete.");        
+        Debug.Log("SpawnPlayers: Both players instantiated.");        
     }
     
-    // timer method
+    // Called every frame from Update(). Counts down the Phase 2 timer and triggers
+    // downstream phase transitions. Does nothing unless _isPhase2Active is true.
     public void Timer()
     {
-        // Safety Check: Only run timer if we are officially in Phase 2
+        // Gate: only run during Phase 2
         if (!_isPhase2Active) return;
 
-        // set the current amount of seconds to the variable container
+        // Decrement the timer in real time
         _phase2Timer -= Time.deltaTime;
 
-        // with a grace area of 2 seconds, spawn the shoot object when the timer has eclipsed the delay
+        // Trigger the weapon pickup spawn once the timer falls below the delay threshold.
+        // _isGunSpawning prevents this from firing more than once per round.
         if (!_isGunSpawning && _phase2Timer <= (_phase3TimerDelay - 2f))
         {
             SpawnShoot();
         }
 
+        // If the timer runs out with no winner, end the round with no point awarded
         if (_phase2Timer <= 0f)
         {
             EndOfRound();
         }        
     }
 
-    
 
     /*  ========================================
                         PHASE 3
+        ========================================
+        Phase 3 activates when the weapon pickup spawns in the arena.
+        The losing player can touch this pickup to transform into a shooter object,
+        then fire projectiles at the winning player for a chance to steal the round.
+        TransformPlayer() is called by PlayerBehavior.OnCollisionEnter when the
+        loser touches the Weapon-tagged object.
         ========================================    */
 
-    // spawn the prefab that will let the losing hand fight back
+    // Instantiates the Weapon pickup at a random spawn point in the arena.
+    // Called once per round by Timer() when the countdown crosses the delay threshold.
     void SpawnShoot()
     {
-        // Prevent spawning a second gun for this round
-        if (_isGunSpawning) 
-        {
-            return; 
-        }
+        // 1. Guard: if already spawned this round, do nothing
+        if (_isGunSpawning) return;
 
+        // 2. Guard: if no spawn points were assigned in the inspector, warn and bail
         if (ShootSpawnPoints.Count == 0)
         {
             Debug.LogWarning("GameMaster: No shoot spawn points assigned!");
-            _isGunSpawning = true; // Fail safely so it doesn't loop spamming warnings
+            _isGunSpawning = true;  // Set true to prevent repeated warnings every frame
             return;
         }
 
+        // 3. Pick a random spawn point from the list
         _shootRandomIndex = Random.Range(0, ShootSpawnPoints.Count);
-
         _currentShootInstance = null;
 
+        // 4. Instantiate the weapon pickup at the chosen spawn point
         if (_shootObject != null)
         {
-            // Instantiate at the random spawn point
-            _currentShootInstance = Instantiate(_shootObject, 
-                                                ShootSpawnPoints[_shootRandomIndex].position, 
-                                                ShootSpawnPoints[_shootRandomIndex].rotation);
+            _currentShootInstance = Instantiate(
+                _shootObject, 
+                ShootSpawnPoints[_shootRandomIndex].position, 
+                ShootSpawnPoints[_shootRandomIndex].rotation
+            );
             
-            Debug.Log("Shoot Object Spawned.");
-            
-            // Set flag to true so it only spawns once this round
-            _isGunSpawning = true; 
-            
-            // Note: You need to attach behavior to _currentShootInstance here later
-            // For now, we just spawned the container/gun object.
+            Debug.Log("SpawnShoot: Weapon pickup spawned.");
 
+            // 5. Lock the flag so this method cannot fire again this round
+            _isGunSpawning = true; 
         }
         else
         {
-            Debug.LogWarning("GameMaster : No shoot object prefab assigned in inspector");
+            Debug.LogWarning("GameMaster: _shootObject prefab not assigned in inspector.");
         }
     }
 
+    // Destroys the losing player's current prefab and replaces it with the shoot object.
+    // Called by PlayerBehavior.OnCollisionEnter when the loser touches the Weapon pickup.
+    // The new object inherits the player's control scheme and is flagged as able to shoot.
     public void TransformPlayer(PlayerBehavior.PlayerType dyingPlayerType)
     {
         GameObject targetObj = null;
         
-        // 1. Identify which specific object is losing
-        if (dyingPlayerType == PlayerBehavior.PlayerType.Player01)
+        // 1. Resolve which scene instance belongs to the dying player
+        if      (dyingPlayerType == PlayerBehavior.PlayerType.Player01) targetObj = _currentPlayerInstance1;
+        else if (dyingPlayerType == PlayerBehavior.PlayerType.Player02) targetObj = _currentPlayerInstance2;
+
+        // 2. Safety check — if the instance is already gone, abort to avoid null errors
+        if (targetObj == null) return;
+
+        // 3. Capture data from the old object BEFORE destroying it
+        Vector3 deathPos    = targetObj.transform.position;         // Spawn the new object here
+        var oldBehavior     = targetObj.GetComponent<PlayerBehavior>();
+
+        // 4. Destroy the old RPS player object — it no longer exists in the scene
+        Destroy(targetObj);
+
+        // 5. Instantiate the shoot/gun prefab at the position the old player occupied
+        _currentShootInstance = Instantiate(_shootObject, deathPos, Quaternion.identity);
+            
+        // 6. Get or add PlayerBehavior on the new object so it can move and shoot.
+        //    The shoot prefab may or may not already have PlayerBehavior attached.
+        var newBehavior = _currentShootInstance.GetComponent<PlayerBehavior>();
+        if (newBehavior == null) newBehavior = _currentShootInstance.AddComponent<PlayerBehavior>();
+
+        // 7. Transfer the projectile prefab reference from the old player.
+        //    Without this, Shoot() in PlayerBehavior would find _projectilePrefab null and abort.
+        if (oldBehavior._projectilePrefab != null)
         {
-            targetObj = _currentPlayerInstance1;
+            newBehavior._projectilePrefab = oldBehavior._projectilePrefab;
         }
-        else if (dyingPlayerType == PlayerBehavior.PlayerType.Player02) 
-        {
-            targetObj = _currentPlayerInstance2;
-        }
 
-        // 2. Safety check before destroy
-        if (targetObj != null)
-        {
-            // Get position and data from OLD player
-            Vector3 deathPos = targetObj.transform.position;
+        // 8. Copy the player identity and hand type so controls and RPS data carry over.
+        //    PlayerSelect determines whether WASD or Arrow keys are used (see PlayerBehavior.MovePlayers).
+        newBehavior.PlayerSelect    = dyingPlayerType;
+        newBehavior.HandSelect      = oldBehavior.HandSelect;
+        newBehavior.shooterType     = dyingPlayerType;  // Used by ProjectileBehavior to credit the correct player
+
+        // 9. Enable shooting on the new object — this flag is checked in PlayerBehavior.Update()
+        newBehavior.canShoot = true;
             
-            // CRITICAL: Copy control scheme FROM old player TO new gun object
-            var oldBehavior = targetObj.GetComponent<PlayerBehavior>();
-            
-            Destroy(targetObj);
-
-            // 3. Instantiate shoot object at the location of the destroyed player
-            _currentShootInstance = Instantiate(_shootObject, deathPos, Quaternion.identity);
-            
-            // 4. Attach PlayerBehavior component to preserve data
-            var newBehavior = _currentShootInstance.GetComponent<PlayerBehavior>();
-            if (newBehavior == null) 
-            {
-                newBehavior = _currentShootInstance.AddComponent<PlayerBehavior>();
-            }
-
-            // Inherit the projectile prefab (otherwise PlayerBehavior will think its empty)
-            if (oldBehavior._projectilePrefab != null) 
-            {
-                newBehavior._projectilePrefab = oldBehavior._projectilePrefab;
-            }
-
-            // 4. Copy the control scheme from the old player!
-            newBehavior.PlayerSelect = dyingPlayerType;         // WASD vs Arrows
-            newBehavior.HandSelect = oldBehavior.HandSelect;    // Keep RPS hand type if you want
-
-            // NEW
-            newBehavior.shooterType = dyingPlayerType;
-
-            // 5. mark the new object as being able to shoot projectiles
-            newBehavior.canShoot = true;
-            
-            // Get or add Rigidbody directly on the GameObject, not through the behavior's cached field
-            Rigidbody rb = _currentShootInstance.GetComponent<Rigidbody>();
-            if (rb == null) rb = _currentShootInstance.AddComponent<Rigidbody>();
-            rb.useGravity = false;
-            rb.constraints = RigidbodyConstraints.FreezePositionY
+        // 10. Set up the Rigidbody directly on the GameObject (not through newBehavior._rb,
+        //     which won't be assigned until Start() runs next frame).
+        //     Constraints match the player setup: no Y movement, no X/Z rotation tipping.
+        Rigidbody rb = _currentShootInstance.GetComponent<Rigidbody>();
+        if (rb == null) rb = _currentShootInstance.AddComponent<Rigidbody>();
+        rb.useGravity   = false;
+        rb.constraints  = RigidbodyConstraints.FreezePositionY
                         | RigidbodyConstraints.FreezeRotationX
                         | RigidbodyConstraints.FreezeRotationZ;
 
-            // Manually assign it to newBehavior so it doesn't have to wait for Start()
-            newBehavior._rb = rb;
-            
-                        
-        }
-        
+        // 11. Manually inject the Rigidbody reference so PlayerBehavior can use it immediately
+        //     without waiting for its own Start() to run on the next frame.
+        newBehavior._rb = rb;
     }
-
 
 
     /*  ========================================
                         ROUND END
+        ========================================
+        EndOfRound() is the single exit point for all round-ending events:
+        - A player collision win (called from PlayerBehavior.WaitWhichPlayerWereYouAgain)
+        - A projectile hit (called from ProjectileBehavior.OnCollisionEnter)
+        - The timer running out (called from Timer())
+        It checks for a match winner, cleans up the scene, and returns to Phase 1.
         ========================================    */
+
+    // Central round-end handler. Called from PlayerBehavior, ProjectileBehavior, and Timer().
+    // Points should already be added before this is called — this method only finalizes the round.
     public void EndOfRound()
     {
-
-        // check if the max amount of points has been reaches
+        // 1. Check if a player has hit the point limit — loads the game over scene if so.
+        //    This runs BEFORE Cleanup so scores are still valid when checked.
         AreWeDoneYet();
+
+        // 2. Destroy all scene objects from this round and reset all state flags
         Cleanup();
         
-        // update points UI
+        // 3. Refresh the score display with the latest point values.
+        //    Linked to UIMaster.UpdatePoints() which reads from GameMaster.Getpoints().
         UIMaster.Instance.UpdatePoints();
+
+        // 4. Hide the Phase 2 timer UI
         UIMaster.Instance.DisableUI_TimerText();
 
-        //re-launch UI
+        // 5. Show the Phase 1 button screen so a new round can begin
         UIMaster.Instance.EnableUI_Phase1Parent();
     }    
 
-    // add a point to player 1
+    // Increments P1's score by 1.
+    // Called by PlayerBehavior.WaitWhichPlayerWereYouAgain() or ProjectileBehavior.OnCollisionEnter()
+    // when a win condition for P1 is confirmed.
     public void AddPointToPlayer01()
     {
-        _points1    ++;
-        Debug.Log ($"player one now has {_points1} point(s)");
-
+        _points1++;
+        Debug.Log($"AddPointToPlayer01: P1 now has {_points1} point(s)");
     }
 
-    // add a point to player 2
+    // Increments P2's score by 1.
+    // Called by PlayerBehavior.WaitWhichPlayerWereYouAgain() or ProjectileBehavior.OnCollisionEnter()
+    // when a win condition for P2 is confirmed.
     public void AddPointToPlayer02()
     {
-        _points2    ++;
-        Debug.Log ($"player two now has {_points2} point(s)");
+        _points2++;
+        Debug.Log($"AddPointToPlayer02: P2 now has {_points2} point(s)");
     }
 
-
-    // Clean up various data after the roud has been completed to set it to a base state
+    // Destroys all live scene objects from the current round and resets every state variable
+    // back to its default so the next round starts from a clean slate.
+    // Called at the end of every EndOfRound().
     void Cleanup()
     {
-        // Destroy any projectiles still in the scene
+        // 1. Destroy any projectiles still flying through the scene.
+        //    Projectiles are tagged "Projectile" in PlayerBehavior.Shoot() — this sweeps all of them.
         foreach (GameObject proj in GameObject.FindGameObjectsWithTag("Projectile"))
         {
             Destroy(proj);
         }
 
+        // 2. Destroy the player instances and the weapon/gun object if they still exist
         if (_currentPlayerInstance1 != null) Destroy(_currentPlayerInstance1);
         if (_currentPlayerInstance2 != null) Destroy(_currentPlayerInstance2);
-        if (_currentShootInstance != null)   Destroy(_currentShootInstance);
+        if (_currentShootInstance   != null) Destroy(_currentShootInstance);
 
+        // 3. Null all instance references so nothing else can touch destroyed objects
         _selectedPlayer1        = null;
         _selectedPlayer2        = null;
         _currentPlayerInstance1 = null;
         _currentPlayerInstance2 = null;
         _currentShootInstance   = null;
 
-        _isGunSpawning  = false;
+        // 4. Reset all phase state flags and the timer
+        _isGunSpawning  = false;    // Allows the weapon to spawn again next round
         _shootRandomIndex = 0;
         _phase2Timer    = 0f;
-        _isPhase2Active = false;
+        _isPhase2Active = false;    // Stops Timer() from running between rounds
     }
+
 
     /*  ========================================
                         GAME END
+        ========================================
+        Called at the start of every EndOfRound(). If a player's score has reached
+        the maximum, the game over scene is loaded immediately.
         ========================================    */
 
-    // check if the game win condition has been reached
+    // Checks both scores against pointsMax and loads the game over scene if either player has won.
+    // Runs before Cleanup() in EndOfRound() so scores are still valid when evaluated.
     void AreWeDoneYet()
     {
         if (_points1 >= pointsMax)
         {
-            Debug.Log ("GameOver, Player1 has won");
+            Debug.Log("AreWeDoneYet: Player 1 has won the match.");
             SceneManager.LoadScene("ScreenGameOver");
-
+            return;
         }
 
         if (_points2 >= pointsMax)
         {
-            Debug.Log ("GameOver, Player2 has won");
+            Debug.Log("AreWeDoneYet: Player 2 has won the match.");
             SceneManager.LoadScene("ScreenGameOver");
+            return;
         }
     }     
 }

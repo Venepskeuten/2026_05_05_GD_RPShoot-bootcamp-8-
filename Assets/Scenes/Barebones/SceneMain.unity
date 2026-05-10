@@ -394,7 +394,7 @@ MonoBehaviour:
   _spawnPointPlayer2: {fileID: 1598082765}
   Player1Prefabs:
   - {fileID: 1215032040568803966, guid: 1707aaac05bb1ed41acfbaa207d31774, type: 3}
-  - {fileID: 1441454232472386175, guid: 3d7efa801e0af9744912496340cf60d8, type: 3}
+  - {fileID: 2566905071661602228, guid: 69d98627570a37440a196dfb7d1a4d13, type: 3}
   - {fileID: 2140626324993371356, guid: d33366c62a47e294393efcf8e3007fee, type: 3}
   Player2Prefabs:
   - {fileID: 6645906305637379368, guid: 894573da6d10f834092efb4c032b619b, type: 3}
