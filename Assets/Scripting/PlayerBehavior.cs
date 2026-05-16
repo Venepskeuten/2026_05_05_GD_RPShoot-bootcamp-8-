@@ -164,8 +164,8 @@ public class PlayerBehavior : MonoBehaviour
 
         if      (Input.GetKey(KeyCode.UpArrow))    { _direction = Vector3.forward;  _targetRotation = Quaternion.Euler(0, 0,   0); }
         else if (Input.GetKey(KeyCode.DownArrow))  { _direction = Vector3.back;     _targetRotation = Quaternion.Euler(0, 180, 0); }
-        else if (Input.GetKey(KeyCode.RightArrow)) { _direction = Vector3.left;     _targetRotation = Quaternion.Euler(0, 270, 0); }
-        else if (Input.GetKey(KeyCode.LeftArrow))  { _direction = Vector3.right;    _targetRotation = Quaternion.Euler(0, 90,  0); }
+        else if (Input.GetKey(KeyCode.LeftArrow)) { _direction = Vector3.left;     _targetRotation = Quaternion.Euler(0, 270, 0); }
+        else if (Input.GetKey(KeyCode.RightArrow))  { _direction = Vector3.right;    _targetRotation = Quaternion.Euler(0, 90,  0); }
 
         if (_direction != Vector3.zero)
         {
