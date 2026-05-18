@@ -12,9 +12,10 @@ GameObject:
   - component: {fileID: 7391958618041874384}
   - component: {fileID: 5211398885267811313}
   - component: {fileID: -6177116775669474774}
-  - component: {fileID: 8769418845890647797}
+  - component: {fileID: -8077634563272946920}
+  - component: {fileID: 5823700222453321459}
   m_Layer: 0
-  m_Name: scissorplayer2
+  m_Name: scissorplayer1
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -29,7 +30,7 @@ Transform:
   m_GameObject: {fileID: 439026485237672088}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -4.146743, y: 2.6812022, z: -0.73048127}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -104,17 +105,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: bb5187158845c384880b2ef6ef79f9bd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerBehavior
-  PlayerSelect: 1
-  shooterType: 1
+  PlayerSelect: 0
+  shooterType: 0
   HandSelect: 2
   isLoser: 0
   canTransform: 0
   canShoot: 0
   hasTransformed: 0
   _rb: {fileID: 0}
-  _projectilePrefab: {fileID: 0}
+  _projectilePrefab: {fileID: 8057886398420060687, guid: 491ac6b806988e84888fb2e4a8087b5b, type: 3}
   _projectileSpeed: 10
---- !u!65 &8769418845890647797
+--- !u!65 &-8077634563272946920
 BoxCollider:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -133,5 +134,32 @@ BoxCollider:
   m_ProvidesContacts: 0
   m_Enabled: 1
   serializedVersion: 3
-  m_Size: {x: 0.85966337, y: 1.4748929, z: 0.49494332}
-  m_Center: {x: 0.0010928512, y: -0.25291336, z: 0.018727869}
+  m_Size: {x: 0.85966325, y: 1.4748929, z: 0.5698551}
+  m_Center: {x: 0.0010927916, y: -0.25291336, z: -0.0055419654}
+--- !u!54 &5823700222453321459
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 439026485237672088}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 1
+  m_IsKinematic: 0
+  m_Interpolate: 0
+  m_Constraints: 4
+  m_CollisionDetection: 0
